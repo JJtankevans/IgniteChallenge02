@@ -23,20 +23,72 @@ const CartContext = createContext<CartContextData>({} as CartContextData);
 
 export function CartProvider({ children }: CartProviderProps): JSX.Element {
   const [cart, setCart] = useState<Product[]>(() => {
-    // const storagedCart = Buscar dados do localStorage
-
-    // if (storagedCart) {
-    //   return JSON.parse(storagedCart);
-    // }
+    //Busca os dados do local storage
+    const storagedCart = localStorage.getItem('@RocketShoes:cart');
+    
+    if (storagedCart) {
+       return JSON.parse(storagedCart);
+    }
 
     return [];
   });
 
+  
+
   const addProduct = async (productId: number) => {
     try {
-      // TODO
+      /* É necessário criar esta variavel porque se não todas as alterações
+      que seriam feitas iriam afetar diretamente o estado de cart
+      o que quebraria o conceito da imutabilidade do react*/
+      const updatedCart = [...cart];
+
+      //Verifica se o id do produto que é passado para a função já existe no carrinho
+      const productExists = updatedCart.find(product => product.id == productId);
+
+      //Verifica a quantidade existentes no estoque
+      const stock = await api.get(`stock/${productId}`);
+
+      //Atribui somente a quantidade a esta variavel
+      const stockAmount = stock.data.amount;
+      
+      //Se o produto já existe no carrinho pega a quantidade se não existe retorna 0
+      const currentAmount = productExists ? productExists.amount : 0;
+
+      //Seria quantidade desejada de produtos no carrinho
+      const amount = currentAmount + 1;
+
+      /*Se a quantidade solicitada ultrapassar a quantidade existente no stock
+      retorna este erro*/
+      if (amount > stockAmount){
+        toast.error('Quantidade solicitada fora de estoque');
+        return; 
+      }
+
+      /*Verifica se o produto já existe no carrinho se existir mostra a nova quantidade 
+      se não existir busca o produto */
+      if(productExists) {
+        productExists.amount = amount;
+      } else {
+        //Busca infos referente ao produto na API
+        const product = await api.get(`products/${productId}`)
+        
+        /*Cria um novo objeto pq na interface de product exist um amount que 
+        referencia a quantidade do produto que nao existe na API*/
+        const newProduct = {
+          ...product.data,
+          amount: 1
+        }
+        //atualiza o updated cart
+        updatedCart.push(newProduct);
+      }
+
+      //Altera o estado de cart
+      setCart(updatedCart);
+      //Atualiza os valores no localStorage
+      localStorage.setItem('@RocketShoes:cart', JSON.stringify(updatedCart));
+
     } catch {
-      // TODO
+      toast.error('Erro na remoção do produto');
     }
   };
 
